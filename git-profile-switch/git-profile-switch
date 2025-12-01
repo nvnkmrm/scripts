@@ -1,0 +1,51 @@
+#!/bin/zsh
+# Script to switch between different Git SSH configurations
+
+#chmod +x git-profile-switch && sudo ln -sf "$(pwd)/git-profile-switch" /usr/local/bin/gps
+
+# Function to display usage
+
+usage() {
+    echo "Usage: gps <profile>"
+    echo "Profiles: personal | work"
+    exit 1
+}
+
+if [ $# -eq 0 ]; then
+    usage
+fi
+
+PROFILE=$1
+
+# Define your profiles here
+case $PROFILE in
+        personal)
+            SSH_KEY="$HOME/.ssh/id_rsa"
+            GIT_EMAIL="mnaveensmn@gmail.com"
+            GIT_NAME="Naveen Kumar"
+            ;;
+        work)
+            SSH_KEY="$HOME/.ssh/rx_key"
+            GIT_EMAIL="naveen.kumar2@rxglobal.com"
+            GIT_NAME="Kumar, Naveen (RX-CON)"
+            ;;
+        *)
+        echo "Error: Unknown profile '$PROFILE'"
+        usage
+        ;;
+esac
+
+if [ ! -f "$SSH_KEY" ]; then
+    echo "Error: SSH key not found at $SSH_KEY"
+    exit 1
+fi
+
+# Switch SSH key and Git config
+ssh-add -D > /dev/null 2>&1
+ssh-add "$SSH_KEY" 2>&1 | grep -q "Identity added" && echo "✓ SSH key switched" || { echo "✗ Failed to add SSH key"; exit 1; }
+
+git config --global user.email "$GIT_EMAIL"
+git config --global user.name "$GIT_NAME"
+
+echo "✓ Switched to $PROFILE profile"
+echo "  $(git config --global user.name) <$(git config --global user.email)>"
