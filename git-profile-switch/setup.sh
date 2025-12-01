@@ -6,15 +6,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GPS_SCRIPT="$SCRIPT_DIR/git-profile-switch"
 
 # Make script executable
+echo "Making git-profile-switch script executable..."
 chmod +x "$GPS_SCRIPT"
 
 # Create symlink
+echo "Creating symlink in /usr/local/bin (requires sudo)..."
 sudo mkdir -p /usr/local/bin
 sudo ln -sf "$GPS_SCRIPT" /usr/local/bin/gps
+
+echo "Adding command to your PATH..."
 
 # Detect shell RC file
 SHELL_NAME=$(basename "$SHELL")
 case "$SHELL_NAME" in
+
     zsh) RC_FILE="$HOME/.zshrc" ;;
     bash) RC_FILE="${HOME}/.bashrc" ;;
     *) echo "Unsupported shell. Add 'gps work > /dev/null 2>&1' to your shell config manually."; exit 1 ;;
