@@ -134,7 +134,3 @@ This tool modifies:
 
 - **SSH Agent**: Manages loaded SSH keys
 - **Git Global Config** (`~/.gitconfig`): Updates `user.name` and `user.email`
-
-## License
-
-MIT
