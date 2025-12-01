@@ -25,12 +25,12 @@ Edit the `git-profile-switch` script to configure your profiles. Modify the case
 ```bash
 case $PROFILE in
     personal)
-        SSH_KEY="$HOME/.ssh/id_rsa"
+        SSH_KEY="$HOME/.ssh/personal_rsa"
         GIT_EMAIL="your.personal@email.com"
         GIT_NAME="Your Name"
         ;;
     work)
-        SSH_KEY="$HOME/.ssh/work_key"
+        SSH_KEY="$HOME/.ssh/work_rsa"
         GIT_EMAIL="your.work@email.com"
         GIT_NAME="Your Work Name"
         ;;
