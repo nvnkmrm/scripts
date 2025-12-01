@@ -9,7 +9,7 @@ Follow these steps to install the `gps` command:
 ### 1. Clone the Repository
 
 ```bash
-git clone git@github.com:nvnkmrm/nvnkmrm.github.io.git
+git clone git@github.com:nvnkmrm/scripts.git
 ```
 
 ### 2. Navigate to the git-profile-switch Directory
