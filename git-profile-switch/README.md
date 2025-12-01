@@ -56,6 +56,10 @@ This will:
 - Make the `git-profile-switch` script executable
 - Create a symlink in `/usr/local/bin` (requires sudo)
 - Add the command to your PATH
+- Prompt you to choose a default profile for automatic switching:
+  - **Option 1 (work)**: Automatically switches to work profile on new terminal sessions
+  - **Option 2 (personal)**: Automatically switches to personal profile on new terminal sessions
+  - **Option 3 (skip)**: Skip automatic profile switching (manual switching only)
 
 ## Usage
 

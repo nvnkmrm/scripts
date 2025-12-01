@@ -1,10 +1,6 @@
 #!/bin/zsh
 # Script to switch between different Git SSH configurations
 
-#chmod +x git-profile-switch && sudo ln -sf "$(pwd)/git-profile-switch" /usr/local/bin/gps
-
-# Function to display usage
-
 usage() {
     echo "Usage: gps <profile>"
     echo "Profiles: personal | work"
@@ -20,14 +16,14 @@ PROFILE=$1
 # Define your profiles here
 case $PROFILE in
         personal)
-            SSH_KEY="$HOME/.ssh/id_rsa"
+            SSH_KEY="$HOME/.ssh/personal_rsa"
             GIT_EMAIL="mnaveensmn@gmail.com"
             GIT_NAME="Naveen Kumar"
             ;;
         work)
-            SSH_KEY="$HOME/.ssh/rx_key"
-            GIT_EMAIL="naveen.kumar2@rxglobal.com"
-            GIT_NAME="Kumar, Naveen (RX-CON)"
+            SSH_KEY="$HOME/.ssh/company_rsa"
+            GIT_EMAIL="naveen.kumar@company.com"
+            GIT_NAME="Kumar, Naveen"
             ;;
         *)
         echo "Error: Unknown profile '$PROFILE'"
