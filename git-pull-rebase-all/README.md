@@ -138,7 +138,3 @@ If not, add this to your `~/.zshrc` or `~/.bashrc`:
 ```bash
 export PATH="/usr/local/bin:$PATH"
 ```
-
-## License
-
-MIT License - feel free to use and modify as needed.
