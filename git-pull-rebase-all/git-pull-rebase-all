@@ -1,0 +1,81 @@
+#!/bin/zsh
+# Script to traverse all folders and run git pull --rebase on git repositories
+
+usage() {
+    echo "Usage: git-pull-rebase-all [directory]"
+    echo ""
+    echo "Traverses all folders in the specified directory (or current directory)"
+    echo "and runs 'git pull --rebase' on each git repository found."
+    echo ""
+    echo "Arguments:"
+    echo "  directory    Optional: Directory to scan (defaults to current directory)"
+    exit 1
+}
+
+# Get the target directory
+TARGET_DIR="${1:-.}"
+
+# Check if directory exists
+if [ ! -d "$TARGET_DIR" ]; then
+    echo "Error: Directory '$TARGET_DIR' does not exist"
+    exit 1
+fi
+
+echo "Scanning for git repositories in: $TARGET_DIR"
+echo "================================================"
+echo ""
+
+# Counter for stats
+total_repos=0
+success_repos=0
+failed_repos=0
+
+# Traverse all subdirectories in the target directory
+for dir in "$TARGET_DIR"/*/; do
+    # Remove trailing slash
+    dir="${dir%/}"
+    
+    # Get just the folder name
+    folder_name=$(basename "$dir")
+    
+    # Check if it's a git repository
+    if [ -d "$dir/.git" ]; then
+        total_repos=$((total_repos + 1))
+        echo "[$folder_name]"
+        
+        # Change to the directory and run git pull --rebase
+        cd "$dir" || {
+            echo "  ✗ Failed to enter directory"
+            failed_repos=$((failed_repos + 1))
+            echo ""
+            continue
+        }
+        
+        # Run git pull --rebase and capture output
+        if git pull --rebase 2>&1; then
+            echo "  ✓ Pull rebase successful"
+            success_repos=$((success_repos + 1))
+        else
+            echo "  ✗ Pull rebase failed (continuing with other repos)"
+            failed_repos=$((failed_repos + 1))
+        fi
+        
+        # Return to the original directory
+        cd - > /dev/null || exit
+        echo ""
+    fi
+done
+
+# Print summary
+echo "================================================"
+echo "Summary:"
+echo "  Total repositories found: $total_repos"
+echo "  Successful: $success_repos"
+echo "  Failed: $failed_repos"
+
+# Exit with appropriate code
+if [ $failed_repos -gt 0 ]; then
+    exit 1
+else
+    exit 0
+fi
