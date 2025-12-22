@@ -29,7 +29,7 @@ cd scripts/git-pull-rebase-all
 Execute the setup script to make the command executable and optionally install it globally:
 
 ```bash
-./setup.sh
+sh setup.sh
 ```
 
 This will:
