@@ -13,15 +13,15 @@ chmod +x "$GPRA_SCRIPT"
 echo "Creating symlink in /usr/local/bin (requires sudo)..."
 sudo mkdir -p /usr/local/bin
 sudo ln -sf "$GPRA_SCRIPT" /usr/local/bin/git-pull-rebase-all
-sudo ln -sf "$GPRA_SCRIPT" /usr/local/bin/gpra
+sudo ln -sf "$GPRA_SCRIPT" /usr/local/bin/pull-all
 
 echo ""
 echo "✓ Installation complete!"
 echo ""
 echo "You can now use either command:"
 echo "  - git-pull-rebase-all [directory]"
-echo "  - gpra [directory]"
+echo "  - pull-all [directory]"
 echo ""
 echo "Example:"
-echo "  cd ~/projects && gpra"
-echo "  gpra ~/workspace"
+echo "  cd ~/projects && pull-all"
+echo "  pull-all ~/workspace"

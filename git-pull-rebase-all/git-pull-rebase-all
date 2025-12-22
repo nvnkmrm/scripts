@@ -51,12 +51,39 @@ for dir in "$TARGET_DIR"/*/; do
             continue
         }
         
+        # Check if there are uncommitted changes
+        stashed=false
+        if ! git diff-index --quiet HEAD -- 2>/dev/null || ! git diff --quiet 2>/dev/null; then
+            echo "  ⚠ Unstaged changes detected, stashing..."
+            if git stash save "Auto-stash by git-pull-rebase-all" > /dev/null 2>&1; then
+                stashed=true
+            fi
+        fi
+        
         # Run git pull --rebase and capture output
         if git pull --rebase 2>&1; then
             echo "  ✓ Pull rebase successful"
+            
+            # Restore stashed changes if any
+            if [ "$stashed" = true ]; then
+                echo "  ↻ Restoring stashed changes..."
+                if git stash pop > /dev/null 2>&1; then
+                    echo "  ✓ Stashed changes restored"
+                else
+                    echo "  ⚠ Failed to restore stash (may have conflicts)"
+                fi
+            fi
+            
             success_repos=$((success_repos + 1))
         else
             echo "  ✗ Pull rebase failed (continuing with other repos)"
+            
+            # Try to restore stash even if pull failed
+            if [ "$stashed" = true ]; then
+                echo "  ↻ Restoring stashed changes..."
+                git stash pop > /dev/null 2>&1
+            fi
+            
             failed_repos=$((failed_repos + 1))
         fi
         
