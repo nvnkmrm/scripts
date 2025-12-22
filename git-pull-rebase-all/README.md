@@ -100,13 +100,6 @@ Summary:
   Failed: 1
 ```
 
-## Use Cases
-
-- **Workspace Sync**: Keep all your projects up-to-date in one command
-- **Morning Routine**: Update all repositories at the start of your workday
-- **CI/CD**: Automate repository updates in build scripts
-- **Team Workflows**: Ensure all project dependencies are current
-
 ## How It Works
 
 1. The script traverses all immediate subdirectories of the target directory
