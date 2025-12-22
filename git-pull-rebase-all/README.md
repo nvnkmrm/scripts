@@ -33,9 +33,10 @@ Execute the setup script to make the command executable and optionally install i
 ```
 
 This will:
+
 - Make the script executable
-- Optionally copy it to `/usr/local/bin` for global access
-- Create a symbolic link named `gpra` (git pull rebase all) for easier usage
+- Create symbolic links in `/usr/local/bin` for global access
+- Create an alias named `pull-all` for easier usage
 
 ## Usage
 
@@ -50,7 +51,7 @@ git-pull-rebase-all
 Or using the short alias:
 
 ```bash
-gpra
+pull-all
 ```
 
 This will scan all subdirectories in the current directory and run `git pull --rebase` on each git repository found.
@@ -66,7 +67,7 @@ git-pull-rebase-all ~/projects
 Or:
 
 ```bash
-gpra ~/projects
+pull-all ~/projects
 ```
 
 ## Example Output
