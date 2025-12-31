@@ -157,11 +157,3 @@ To remove xrun:
 ```bash
 sudo rm /usr/local/bin/xrun
 ```
-
-## Author
-
-Part of the Scripts collection
-
-## License
-
-MIT
