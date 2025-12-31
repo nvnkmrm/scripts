@@ -127,6 +127,13 @@ xrun --maxD 2 "git pull --rebase"
 xrun -t "node --version"
 ```
 
+### Install Dependencies with Verbose Output and Timing
+
+```bash
+# Shows real-time output and execution time for long-running commands
+xrun -v -t "nvm use && npm install"
+```
+
 ## How It Works
 
 1. **Traversal**: The tool starts from the specified directory (or current directory) and traverses subdirectories up to the specified depth

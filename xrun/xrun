@@ -1,8 +1,11 @@
 #!/bin/zsh
 # Script to traverse directories and run a specified command
 
+# Detect user's shell
+USER_SHELL=$(basename "$SHELL")
+
 # Handle case where no directories match the pattern
-setopt nullglob
+setopt nullglob 2>/dev/null || true
 
 usage() {
     echo "Usage: xrun [OPTIONS] <command>"
@@ -209,17 +212,18 @@ traverse_and_run() {
                 start_time=$(date +%s.%N)
             fi
             
-            # Execute the command
+            # Execute the command in a subshell with user's shell profile loaded
+            # This ensures functions like nvm, aliases, etc. are available
             if [ "$VERBOSE" = true ]; then
                 # Verbose mode: show all output
-                if eval "$COMMAND" 2>&1; then
+                if $USER_SHELL -ic "cd '$dir' && $COMMAND" 2>&1; then
                     cmd_status=0
                 else
                     cmd_status=$?
                 fi
             else
                 # Normal mode: capture output
-                cmd_output=$(eval "$COMMAND" 2>&1)
+                cmd_output=$($USER_SHELL -ic "cd '$dir' && $COMMAND" 2>&1)
                 cmd_status=$?
             fi
             
