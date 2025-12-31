@@ -7,11 +7,13 @@ A command-line tool to traverse directories at a specified depth and run any com
 ## Features
 
 - Execute any command across multiple directories
-- Control traversal depth (default: 1 level)
+- Control traversal depth with min and max depth parameters
+- Skip shallow directories and run commands only at specified depth ranges
 - Specify custom starting directory
 - Error handling: failures in one directory won't block others
 - Provides a summary of successful and failed operations
 - Displays relative paths for easy identification
+- Timing and verbose output options
 
 ## Installation
 
@@ -44,13 +46,16 @@ Run a command in all immediate subdirectories (depth 1):
 xrun "git status"
 ```
 
-### Specify Depth
+### Specify Depth Range
 
-Traverse deeper into the directory tree:
+Control minimum and maximum traversal depth:
 
 ```bash
-xrun --depth 2 "npm test"
-xrun -d 3 "ls -la"
+# Traverse up to depth 2
+xrun --maxD 2 "npm test"
+
+# Run commands only on directories at depth 2-3 (skip depth 1)
+xrun --minD 2 --maxD 3 "git status"
 ```
 
 ### Specify Starting Directory
@@ -65,16 +70,22 @@ xrun -p ~/workspace -d 2 "git status"
 ### Combined Options
 
 ```bash
-xrun -d 2 -p ~/workspace "git fetch --all"
+xrun --maxD 2 -p ~/workspace "git fetch --all"
+xrun --minD 2 --maxD 3 -p ~/projects "git status"
 ```
 
 ## Options
 
-| Option    | Short | Description               | Default                 |
-| --------- | ----- | ------------------------- | ----------------------- |
-| `--depth` | `-d`  | Maximum depth to traverse | 1                       |
-| `--path`  | `-p`  | Starting directory        | Current directory (`.`) |
-| `--help`  | `-h`  | Show help message         | -                       |
+| Option       | Description                                 | Default                 |
+| ------------ | ------------------------------------------- | ----------------------- |
+| `--minD`     | Minimum depth to start running commands     | 1                       |
+| `--maxD`     | Maximum depth to traverse                   | 1                       |
+| `--path`     | Starting directory (alias: `-p`)            | Current directory (`.`) |
+| `--quiet`    | Minimal output (only show failures, `-q`)   | false                   |
+| `--verbose`  | Show command output inline (alias: `-v`)    | false                   |
+| `--timing`   | Show execution time for each command (`-t`) | false                   |
+| `--no-color` | Disable colored output                      | false                   |
+| `--help`     | Show help message (alias: `-h`)             | -                       |
 
 ## Examples
 
@@ -88,25 +99,32 @@ xrun "git status"
 ### Run Tests in All Packages
 
 ```bash
-xrun -d 2 "npm test"
+xrun --maxD 2 "npm test"
+```
+
+### Run Commands Only on Nested Directories (Skip Root Level)
+
+```bash
+# Only run on directories at depth 2 or deeper, up to depth 3
+xrun --minD 2 --maxD 3 --path ~/workspace "git fetch"
 ```
 
 ### List Contents of Nested Directories
 
 ```bash
-xrun --depth 3 --path ~/workspace "ls -la"
+xrun --maxD 3 --path ~/workspace "ls -la"
 ```
 
 ### Update All Git Repositories
 
 ```bash
-xrun -d 2 "git pull --rebase"
+xrun --maxD 2 "git pull --rebase"
 ```
 
-### Check Node Versions
+### Check Node Versions with Timing
 
 ```bash
-xrun "node --version"
+xrun -t "node --version"
 ```
 
 ## How It Works
@@ -122,6 +140,15 @@ xrun "node --version"
 - **Depth 2**: Subdirectories and their subdirectories
 - **Depth 3**: Three levels deep
 - And so on...
+
+### Using minD and maxD Together
+
+- `--minD 1 --maxD 1` (default): Run commands only on immediate subdirectories
+- `--minD 2 --maxD 2`: Skip immediate subdirectories, run only on second level
+- `--minD 1 --maxD 3`: Run on all directories from level 1 to 3
+- `--minD 2 --maxD 4`: Skip level 1, run on levels 2, 3, and 4
+
+The script will traverse through directories at depths below minD to reach deeper directories, but will only execute the command at directories within the minD to maxD range.
 
 ## Tips
 

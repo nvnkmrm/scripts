@@ -10,7 +10,8 @@ usage() {
     echo "Traverses directories and runs the specified command in each one."
     echo ""
     echo "Options:"
-    echo "  -d, --depth <n>      Maximum depth to traverse (default: 1)"
+    echo "  --minD <n>           Minimum depth to start running commands (default: 1)"
+    echo "  --maxD <n>           Maximum depth to traverse (default: 1)"
     echo "  -p, --path <dir>     Starting directory (default: current directory)"
     echo "  -q, --quiet          Minimal output (only show failures)"
     echo "  -v, --verbose        Show command output inline"
@@ -23,8 +24,8 @@ usage() {
     echo ""
     echo "Examples:"
     echo "  xrun \"git status\""
-    echo "  xrun --depth 2 \"npm test\""
-    echo "  xrun -d 3 -p ~/projects \"ls -la\""
+    echo "  xrun --maxD 2 \"npm test\""
+    echo "  xrun --minD 2 --maxD 3 -p ~/projects \"ls -la\""
     echo "  xrun -t -v \"npm install\""
     exit 1
 }
@@ -53,18 +54,27 @@ else
 fi
 
 # Default values
-DEPTH=1
+MIN_DEPTH=1
+MAX_DEPTH=1
 TARGET_DIR="."
 COMMAND=""
 QUIET=false
 VERBOSE=false
 SHOW_TIMING=false
+MIN_DEPTH_SET=false
+MAX_DEPTH_SET=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -d|--depth)
-            DEPTH="$2"
+        -minD|--minD)
+            MIN_DEPTH="$2"
+            MIN_DEPTH_SET=true
+            shift 2
+            ;;
+        -maxD|--maxD)
+            MAX_DEPTH="$2"
+            MAX_DEPTH_SET=true
             shift 2
             ;;
         -p|--path)
@@ -98,6 +108,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# If only minD was set, set maxD to match minD
+if [ "$MIN_DEPTH_SET" = true ] && [ "$MAX_DEPTH_SET" = false ]; then
+    MAX_DEPTH="$MIN_DEPTH"
+fi
+
 # Validate inputs
 if [ -z "$COMMAND" ]; then
     echo "Error: No command specified"
@@ -105,8 +120,18 @@ if [ -z "$COMMAND" ]; then
     usage
 fi
 
-if ! [[ "$DEPTH" =~ ^[0-9]+$ ]] || [ "$DEPTH" -lt 1 ]; then
-    echo "Error: Depth must be a positive integer"
+if ! [[ "$MIN_DEPTH" =~ ^[0-9]+$ ]] || [ "$MIN_DEPTH" -lt 1 ]; then
+    echo "Error: minD must be a positive integer"
+    exit 1
+fi
+
+if ! [[ "$MAX_DEPTH" =~ ^[0-9]+$ ]] || [ "$MAX_DEPTH" -lt 1 ]; then
+    echo "Error: maxD must be a positive integer"
+    exit 1
+fi
+
+if [ "$MIN_DEPTH" -gt "$MAX_DEPTH" ]; then
+    echo "Error: minD ($MIN_DEPTH) cannot be greater than maxD ($MAX_DEPTH)"
     exit 1
 fi
 
@@ -124,7 +149,7 @@ if [ "$QUIET" = false ]; then
     echo "${BOLD}${CYAN}╚═══════════════════════════════════════════════════════════════╝${RESET}"
     echo ""
     echo "${DIM}Path:${RESET}     ${BLUE}$TARGET_DIR${RESET}"
-    echo "${DIM}Depth:${RESET}    ${MAGENTA}$DEPTH${RESET}"
+    echo "${DIM}Depth:${RESET}    ${MAGENTA}$MIN_DEPTH - $MAX_DEPTH${RESET}"
     echo "${DIM}Command:${RESET}  ${YELLOW}$COMMAND${RESET}"
     echo ""
     echo "${DIM}──────────────────────────────────────────────────────────────${RESET}"
@@ -141,7 +166,8 @@ total_time=0
 traverse_and_run() {
     local current_dir="$1"
     local current_depth="$2"
-    local max_depth="$3"
+    local min_depth="$3"
+    local max_depth="$4"
     
     # Stop if we've reached max depth
     if [ "$current_depth" -gt "$max_depth" ]; then
@@ -159,6 +185,15 @@ traverse_and_run() {
         # Get relative path for display
         rel_path="${dir#$TARGET_DIR/}"
         [ "$rel_path" = "$dir" ] && rel_path=$(basename "$dir")
+        
+        # Skip if current depth is less than min depth
+        if [ "$current_depth" -lt "$min_depth" ]; then
+            # Recursively traverse subdirectories without running command
+            if [ "$current_depth" -lt "$max_depth" ]; then
+                traverse_and_run "$dir" $((current_depth + 1)) "$min_depth" "$max_depth"
+            fi
+            continue
+        fi
         
         total_dirs=$((total_dirs + 1))
         
@@ -225,13 +260,13 @@ traverse_and_run() {
         
         # Recursively traverse subdirectories if we haven't reached max depth
         if [ "$current_depth" -lt "$max_depth" ]; then
-            traverse_and_run "$dir" $((current_depth + 1)) "$max_depth"
+            traverse_and_run "$dir" $((current_depth + 1)) "$min_depth" "$max_depth"
         fi
     done
 }
 
 # Start traversal
-traverse_and_run "$TARGET_DIR" 1 "$DEPTH"
+traverse_and_run "$TARGET_DIR" 1 "$MIN_DEPTH" "$MAX_DEPTH"
 
 # Print summary
 echo "${DIM}──────────────────────────────────────────────────────────────${RESET}"
