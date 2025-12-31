@@ -1,0 +1,271 @@
+#!/bin/zsh
+# Script to traverse directories and run a specified command
+
+# Handle case where no directories match the pattern
+setopt nullglob
+
+usage() {
+    echo "Usage: xrun [OPTIONS] <command>"
+    echo ""
+    echo "Traverses directories and runs the specified command in each one."
+    echo ""
+    echo "Options:"
+    echo "  -d, --depth <n>      Maximum depth to traverse (default: 1)"
+    echo "  -p, --path <dir>     Starting directory (default: current directory)"
+    echo "  -q, --quiet          Minimal output (only show failures)"
+    echo "  -v, --verbose        Show command output inline"
+    echo "  -t, --timing         Show execution time for each command"
+    echo "  --no-color           Disable colored output"
+    echo "  -h, --help           Show this help message"
+    echo ""
+    echo "Arguments:"
+    echo "  command              Command to run in each directory (use quotes for complex commands)"
+    echo ""
+    echo "Examples:"
+    echo "  xrun \"git status\""
+    echo "  xrun --depth 2 \"npm test\""
+    echo "  xrun -d 3 -p ~/projects \"ls -la\""
+    echo "  xrun -t -v \"npm install\""
+    exit 1
+}
+
+# Colors
+if [[ -t 1 ]]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    BLUE='\033[0;34m'
+    MAGENTA='\033[0;35m'
+    CYAN='\033[0;36m'
+    BOLD='\033[1m'
+    DIM='\033[2m'
+    RESET='\033[0m'
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    BLUE=''
+    MAGENTA=''
+    CYAN=''
+    BOLD=''
+    DIM=''
+    RESET=''
+fi
+
+# Default values
+DEPTH=1
+TARGET_DIR="."
+COMMAND=""
+QUIET=false
+VERBOSE=false
+SHOW_TIMING=false
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -d|--depth)
+            DEPTH="$2"
+            shift 2
+            ;;
+        -p|--path)
+            TARGET_DIR="$2"
+            shift 2
+            ;;
+        -q|--quiet)
+            QUIET=true
+            shift
+            ;;
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
+        -t|--timing)
+            SHOW_TIMING=true
+            shift
+            ;;
+        --no-color)
+            RED=''; GREEN=''; YELLOW=''; BLUE=''; MAGENTA=''; CYAN=''; BOLD=''; DIM=''; RESET=''
+            shift
+            ;;
+        -h|--help)
+            usage
+            ;;
+        *)
+            # Everything else is treated as the command
+            COMMAND="$*"
+            break
+            ;;
+    esac
+done
+
+# Validate inputs
+if [ -z "$COMMAND" ]; then
+    echo "Error: No command specified"
+    echo ""
+    usage
+fi
+
+if ! [[ "$DEPTH" =~ ^[0-9]+$ ]] || [ "$DEPTH" -lt 1 ]; then
+    echo "Error: Depth must be a positive integer"
+    exit 1
+fi
+
+if [ ! -d "$TARGET_DIR" ]; then
+    echo "Error: Directory '$TARGET_DIR' does not exist"
+    exit 1
+fi
+
+# Get absolute path
+TARGET_DIR=$(cd "$TARGET_DIR" && pwd)
+
+if [ "$QUIET" = false ]; then
+    echo "${BOLD}${CYAN}╔═══════════════════════════════════════════════════════════════╗${RESET}"
+    echo "${BOLD}${CYAN}║${RESET}  ${BOLD}xrun - Execute Across Directories${RESET}                       ${BOLD}${CYAN}║${RESET}"
+    echo "${BOLD}${CYAN}╚═══════════════════════════════════════════════════════════════╝${RESET}"
+    echo ""
+    echo "${DIM}Path:${RESET}     ${BLUE}$TARGET_DIR${RESET}"
+    echo "${DIM}Depth:${RESET}    ${MAGENTA}$DEPTH${RESET}"
+    echo "${DIM}Command:${RESET}  ${YELLOW}$COMMAND${RESET}"
+    echo ""
+    echo "${DIM}──────────────────────────────────────────────────────────────${RESET}"
+    echo ""
+fi
+
+# Counter for stats
+total_dirs=0
+success_dirs=0
+failed_dirs=0
+total_time=0
+
+# Function to traverse directories recursively
+traverse_and_run() {
+    local current_dir="$1"
+    local current_depth="$2"
+    local max_depth="$3"
+    
+    # Stop if we've reached max depth
+    if [ "$current_depth" -gt "$max_depth" ]; then
+        return
+    fi
+    
+    # Process directories at current level
+    for dir in "$current_dir"/*/; do
+        # Check if directory exists (handles case with no subdirectories)
+        [ -d "$dir" ] || continue
+        
+        # Remove trailing slash
+        dir="${dir%/}"
+        
+        # Get relative path for display
+        rel_path="${dir#$TARGET_DIR/}"
+        [ "$rel_path" = "$dir" ] && rel_path=$(basename "$dir")
+        
+        total_dirs=$((total_dirs + 1))
+        
+        # Show progress header (unless quiet mode)
+        if [ "$QUIET" = false ]; then
+            echo "${BOLD}${BLUE}▸${RESET} ${BOLD}$rel_path${RESET} ${DIM}(depth: $current_depth)${RESET}"
+        fi
+        
+        # Change to the directory and run the command
+        if cd "$dir" 2>/dev/null; then
+            # Start timing if requested
+            if [ "$SHOW_TIMING" = true ]; then
+                start_time=$(date +%s.%N)
+            fi
+            
+            # Execute the command
+            if [ "$VERBOSE" = true ]; then
+                # Verbose mode: show all output
+                if eval "$COMMAND" 2>&1; then
+                    cmd_status=0
+                else
+                    cmd_status=$?
+                fi
+            else
+                # Normal mode: capture output
+                cmd_output=$(eval "$COMMAND" 2>&1)
+                cmd_status=$?
+            fi
+            
+            # Calculate timing
+            if [ "$SHOW_TIMING" = true ]; then
+                end_time=$(date +%s.%N)
+                elapsed=$(echo "$end_time - $start_time" | bc)
+                total_time=$(echo "$total_time + $elapsed" | bc)
+                timing_str="${DIM}(${elapsed}s)${RESET}"
+            else
+                timing_str=""
+            fi
+            
+            # Show result
+            if [ $cmd_status -eq 0 ]; then
+                if [ "$QUIET" = false ]; then
+                    echo "  ${GREEN}✓${RESET} Success $timing_str"
+                fi
+                success_dirs=$((success_dirs + 1))
+            else
+                echo "  ${RED}✗${RESET} ${BOLD}Failed${RESET} $timing_str"
+                if [ "$VERBOSE" = false ] && [ -n "$cmd_output" ]; then
+                    echo "${DIM}$cmd_output${RESET}" | sed 's/^/    /'
+                fi
+                failed_dirs=$((failed_dirs + 1))
+            fi
+            
+            # Return to original directory
+            cd - > /dev/null || exit
+        else
+            echo "  ${RED}✗${RESET} ${BOLD}Cannot access directory${RESET}"
+            failed_dirs=$((failed_dirs + 1))
+        fi
+        
+        if [ "$QUIET" = false ] || [ $cmd_status -ne 0 ]; then
+            echo ""
+        fi
+        
+        # Recursively traverse subdirectories if we haven't reached max depth
+        if [ "$current_depth" -lt "$max_depth" ]; then
+            traverse_and_run "$dir" $((current_depth + 1)) "$max_depth"
+        fi
+    done
+}
+
+# Start traversal
+traverse_and_run "$TARGET_DIR" 1 "$DEPTH"
+
+# Print summary
+echo "${DIM}──────────────────────────────────────────────────────────────${RESET}"
+echo ""
+echo "${BOLD}${CYAN}Summary${RESET}"
+echo ""
+
+# Calculate percentages
+if [ $total_dirs -gt 0 ]; then
+    success_pct=$((success_dirs * 100 / total_dirs))
+else
+    success_pct=0
+fi
+
+# Show stats with visual indicators
+echo "  ${DIM}Total:${RESET}     ${BOLD}$total_dirs${RESET} directories"
+echo "  ${GREEN}✓${RESET} Success:  ${GREEN}${BOLD}$success_dirs${RESET} ${DIM}(${success_pct}%)${RESET}"
+echo "  ${RED}✗${RESET} Failed:   ${RED}${BOLD}$failed_dirs${RESET}"
+
+# Show timing summary if enabled
+if [ "$SHOW_TIMING" = true ] && [ $total_dirs -gt 0 ]; then
+    avg_time=$(echo "scale=3; $total_time / $total_dirs" | bc)
+    echo ""
+    echo "  ${DIM}Total time:${RESET}   ${total_time}s"
+    echo "  ${DIM}Avg per dir:${RESET}  ${avg_time}s"
+fi
+
+echo ""
+
+# Exit with appropriate code
+if [ $failed_dirs -gt 0 ]; then
+    echo "${YELLOW}⚠${RESET}  ${BOLD}Completed with failures${RESET}"
+    exit 1
+else
+    echo "${GREEN}✓${RESET}  ${BOLD}All commands executed successfully${RESET}"
+    exit 0
+fi
