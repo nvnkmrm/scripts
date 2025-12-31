@@ -1,5 +1,7 @@
 # xrun
 
+Inspired by [@vraravam](https://github.com/vraravam)'s [run_all.sh](https://github.com/vraravam/git_scripts?tab=readme-ov-file#run_allsh)
+
 A command-line tool to traverse directories at a specified depth and run any command in each directory.
 
 ## Features
