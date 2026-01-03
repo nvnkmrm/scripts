@@ -1,0 +1,9 @@
+projects:
+  - url: https://github.com/alajmo/pinto.git
+    folder: frontend
+
+  - url: https://github.com/alajmo/dashgrid.git
+    folder: frontend
+
+  - url: https://github.com/alajmo/template-generator.git
+    folder: frontend
