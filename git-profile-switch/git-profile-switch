@@ -1,9 +1,55 @@
 #!/bin/zsh
 # Script to switch between different Git SSH configurations
+# Profiles are defined in profiles.yaml (same directory as this script)
+
+SCRIPT_DIR="${0:A:h}"
+YAML_FILE="${SCRIPT_DIR}/profiles.yaml"
+
+# Check if yq is installed
+if ! command -v yq &> /dev/null; then
+    echo "⚠️  yq is not installed"
+    echo ""
+    printf "Would you like to install yq using Homebrew? (y/n): "
+    read -r REPLY
+    echo ""
+
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if ! command -v brew &> /dev/null; then
+            echo "Error: Homebrew is not installed"
+            echo "Please install Homebrew first: https://brew.sh"
+            exit 1
+        fi
+
+        echo "Installing yq..."
+        if brew install yq; then
+            echo "✅ yq installed successfully"
+        else
+            echo "❌ Failed to install yq"
+            exit 1
+        fi
+    else
+        echo "Installation cancelled. Please install yq manually:"
+        echo "  brew install yq"
+        exit 1
+    fi
+fi
+
+# Check if profiles.yaml exists
+if [ ! -f "$YAML_FILE" ]; then
+    echo "Error: profiles.yaml not found at $YAML_FILE"
+    exit 1
+fi
+
+# Build list of available profile names from YAML
+PROFILE_COUNT=$(yq eval '.profiles | length' "$YAML_FILE")
+PROFILE_NAMES=()
+for ((i=0; i<PROFILE_COUNT; i++)); do
+    PROFILE_NAMES+=("$(yq eval ".profiles[$i].name" "$YAML_FILE")")
+done
 
 usage() {
     echo "Usage: gps <profile>"
-    echo "Profiles: personal | work"
+    echo "Available profiles: ${(j: | :)PROFILE_NAMES}"
     exit 1
 }
 
@@ -13,23 +59,28 @@ fi
 
 PROFILE=$1
 
-# Define your profiles here
-case $PROFILE in
-        personal)
-            SSH_KEY="$HOME/.ssh/personal_rsa"
-            GIT_EMAIL="your.personal@email.com"
-            GIT_NAME="Your Name"
-            ;;
-        work)
-            SSH_KEY="$HOME/.ssh/work_rsa"
-            GIT_EMAIL="your.work@email.com"
-            GIT_NAME="Your Work Name"
-            ;;
-        *)
-        echo "Error: Unknown profile '$PROFILE'"
-        usage
-        ;;
-esac
+# Find matching profile index in YAML
+MATCH_INDEX=-1
+for ((i=0; i<PROFILE_COUNT; i++)); do
+    NAME=$(yq eval ".profiles[$i].name" "$YAML_FILE")
+    if [ "$NAME" = "$PROFILE" ]; then
+        MATCH_INDEX=$i
+        break
+    fi
+done
+
+if [ "$MATCH_INDEX" -eq -1 ]; then
+    echo "Error: Unknown profile '$PROFILE'"
+    usage
+fi
+
+# Read profile fields
+SSH_KEY=$(yq eval ".profiles[$MATCH_INDEX].ssh_key" "$YAML_FILE")
+GIT_EMAIL=$(yq eval ".profiles[$MATCH_INDEX].email" "$YAML_FILE")
+GIT_NAME=$(yq eval ".profiles[$MATCH_INDEX].user_name" "$YAML_FILE")
+
+# Expand ~ in SSH_KEY path
+SSH_KEY="${SSH_KEY/#\~/$HOME}"
 
 if [ ! -f "$SSH_KEY" ]; then
     echo "Error: SSH key not found at $SSH_KEY"

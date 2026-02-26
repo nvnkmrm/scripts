@@ -20,28 +20,26 @@ cd git-profile-switch
 
 ### 3. Configure Your Profiles
 
-Edit the `git-profile-switch` script to configure your profiles. Modify the case statement to match your SSH keys, email addresses, and names:
+Edit `profiles.yaml` to define your profiles. Each profile needs a `name`, `ssh_key`, `email`, and `git_name`:
 
-```bash
-case $PROFILE in
-    personal)
-        SSH_KEY="$HOME/.ssh/personal_rsa"
-        GIT_EMAIL="your.personal@email.com"
-        GIT_NAME="Your Name"
-        ;;
-    work)
-        SSH_KEY="$HOME/.ssh/work_rsa"
-        GIT_EMAIL="your.work@email.com"
-        GIT_NAME="Your Work Name"
-        ;;
-    *)
-        echo "Error: Unknown profile '$PROFILE'"
-        usage
-        ;;
-esac
+```yaml
+profiles:
+  - name: personal
+    ssh_key: ~/.ssh/personal_rsa
+    email: your.personal@email.com
+    git_name: Your Name
+
+  - name: work
+    ssh_key: ~/.ssh/work_rsa
+    email: your.work@email.com
+    git_name: Your Work Name
 ```
 
+You can add as many profiles as you need — no script modifications required.
+
 **Important:** Make sure your SSH keys exist at the specified paths before proceeding.
+
+> **Dependency:** The script uses [`yq`](https://github.com/mikefarah/yq) to parse the YAML file. If `yq` is not installed, the script will offer to install it automatically via Homebrew.
 
 ### 4. Run the Setup Script
 
@@ -111,7 +109,7 @@ The `gps` command performs the following actions:
 If you see "Error: SSH key not found at...", verify:
 
 - The SSH key exists at the specified path
-- The path in the `git-profile-switch` script is correct
+- The `ssh_key` value in `profiles.yaml` is correct
 - You have read permissions for the key
 
 ### Permission Denied

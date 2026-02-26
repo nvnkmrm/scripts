@@ -1,0 +1,10 @@
+profiles:
+  - name: personal
+    ssh_key: ~/.ssh/personal_rsa
+    email: your.personal@email.com
+    user_name: Your Name
+
+  - name: work
+    ssh_key: ~/.ssh/work_rsa
+    email: your.work@email.com
+    user_name: Your Work Name
