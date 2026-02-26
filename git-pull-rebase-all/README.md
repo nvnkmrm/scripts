@@ -1,13 +1,16 @@
 # Git Pull Rebase All
 
-A command-line tool to traverse all folders in a directory and automatically run `git pull --rebase` on every git repository found.
+A command-line tool to traverse all folders in a directory and automatically update ALL local branches in every git repository by rebasing them onto their upstream tracking branches.
 
 ## Features
 
 - Automatically discovers all git repositories in subdirectories
-- Runs `git pull --rebase` on each repository
+- Updates **all local branches** (not just the current branch) by rebasing onto their upstream
+- Fetches from all remotes before updating
+- Automatically stashes uncommitted changes and restores them after updates
+- Returns to the originally checked-out branch after updating all branches
 - Error handling: failures in one repository won't block others
-- Provides a summary of successful and failed operations
+- Provides detailed summary of operations per repository
 - Optional: specify a target directory or use the current directory
 
 ## Installation
@@ -77,21 +80,30 @@ Scanning for git repositories in: .
 ================================================
 
 [project-1]
-Already up to date.
-  ✓ Pull rebase successful
+  ⚠ Unstaged changes detected, stashing...
+  ↓ Fetching from remotes...
+  → Updating branch: feature1
+    ✓ Rebased feature1 onto origin/feature1
+  → Updating branch: main
+    ✓ Rebased main onto origin/main
+  → Updating branch: feature2
+    ✓ Rebased feature2 onto origin/feature2
+  ← Returned to branch: main
+  ↻ Restoring stashed changes...
+  ✓ Stashed changes restored
+  ✓ Repository update complete (3 updated, 0 without upstream)
 
 [project-2]
-remote: Enumerating objects: 5, done.
-remote: Counting objects: 100% (5/5), done.
-Updating 1234567..abcdefg
-Fast-forward
- file.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-  ✓ Pull rebase successful
+  ↓ Fetching from remotes...
+  → Updating branch: develop
+    ✓ Rebased develop onto origin/develop
+  → Updating branch: main
+    ✓ Rebased main onto origin/main
+  ← Returned to branch: develop
+  ✓ Repository update complete (2 updated, 1 without upstream)
 
 [project-3]
-fatal: unable to access 'https://...': Could not resolve host
-  ✗ Pull rebase failed (continuing with other repos)
+  ✗ Failed to fetch from remotes
 
 ================================================
 Summary:
@@ -104,7 +116,16 @@ Summary:
 
 1. The script traverses all immediate subdirectories of the target directory
 2. For each subdirectory, it checks if a `.git` folder exists
-3. If it's a git repository, it enters the directory and runs `git pull --rebase`
+3. If it's a git repository, it:
+   - Saves the current branch name
+   - Stashes any uncommitted changes (if present)
+   - Fetches from all remotes
+   - Identifies all local branches with upstream tracking branches
+   - For each tracked branch:
+     - Checks out the branch
+     - Rebases it onto its upstream (e.g., `origin/main`)
+   - Returns to the original branch
+   - Restores stashed changes (if any)
 4. If an error occurs, it logs the failure and continues with the next repository
 5. Finally, it provides a summary of all operations
 
