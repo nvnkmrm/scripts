@@ -25,26 +25,47 @@ case "$SHELL_NAME" in
     *) echo "Unsupported shell. Add 'gps work > /dev/null 2>&1' to your shell config manually."; exit 1 ;;
 esac
 
+# Read profiles from profiles.yaml
+PROFILES_YAML="$SCRIPT_DIR/profiles.yaml"
+if [[ ! -f "$PROFILES_YAML" ]]; then
+    echo "profiles.yaml not found at $PROFILES_YAML"
+    exit 1
+fi
+
+# Extract profile names from profiles.yaml
+PROFILES=()
+while IFS= read -r line; do
+    PROFILES+=("$line")
+done <<< "$(grep -E '^\s*-\s*name:' "$PROFILES_YAML" | awk -F': ' '{print $2}')"
+
 # Ask user for default profile
 echo "Choose default git profile for terminal:"
-echo "1) work"
-echo "2) personal"
-echo "3) skip"
-read -p "Enter choice (1, 2, or 3): " choice
+for i in "${!PROFILES[@]}"; do
+    echo "$((i+1))) ${PROFILES[$i]}"
+done
+SKIP_NUM=$((${#PROFILES[@]} + 1))
+echo "$SKIP_NUM) skip"
+read -p "Enter choice (1-$SKIP_NUM): " choice
 
-case $choice in
-    1) PROFILE="work" ;;
-    2) PROFILE="personal" ;;
-    3) echo "Skipping auto-switch."; exit 0 ;;
-    *) echo "Invalid choice. Skipping auto-switch."; exit 0 ;;
-esac
-
-# Add auto-switch to RC file if not present
-if ! grep -q "gps " "$RC_FILE" 2>/dev/null; then
-    echo "" >> "$RC_FILE"
-    echo "# Auto-switch to $PROFILE git profile" >> "$RC_FILE"
-    echo "gps $PROFILE > /dev/null 2>&1" >> "$RC_FILE"
-    echo "Added 'gps $PROFILE' to $RC_FILE"
+if [[ "$choice" =~ ^[0-9]+$ ]] && [[ "$choice" -ge 1 && "$choice" -lt "$SKIP_NUM" ]]; then
+    PROFILE="${PROFILES[$((choice-1))]}"
+elif [[ "$choice" == "$SKIP_NUM" ]]; then
+    echo "Skipping auto-switch."
+    exit 0
+else
+    echo "Invalid choice. Skipping auto-switch."
+    exit 0
 fi
+
+# Remove existing gps entry (comment + command) if present, then add updated one
+if grep -q "gps " "$RC_FILE" 2>/dev/null; then
+    sed -i '' '/# Auto-switch to .* git profile/d' "$RC_FILE"
+    sed -i '' '/gps .* > \/dev\/null 2>&1/d' "$RC_FILE"
+    sed -i '' '/^[[:space:]]*$/d' "$RC_FILE"
+    echo "Removed existing gps entry from $RC_FILE"
+fi
+echo "# Auto-switch to $PROFILE git profile" >> "$RC_FILE"
+echo "gps $PROFILE > /dev/null 2>&1" >> "$RC_FILE"
+echo "Added 'gps $PROFILE' to $RC_FILE"
 
 echo "Installation complete. Run: source $RC_FILE"
