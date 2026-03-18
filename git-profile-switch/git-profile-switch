@@ -2,6 +2,9 @@
 # Script to switch between different Git SSH configurations
 # Profiles are defined in profiles.yaml (same directory as this script)
 
+# Suppress xtrace if enabled in the parent shell (prevents leaking variable assignments)
+{ set +x; } 2>/dev/null
+
 SCRIPT_DIR="${0:A:h}"
 YAML_FILE="${SCRIPT_DIR}/profiles.yaml"
 
@@ -53,8 +56,34 @@ usage() {
     exit 1
 }
 
+show_current_profile() {
+    local current_email current_name current_profile="" profile_email profile_name
+    current_email=$(git config --global user.email 2>/dev/null)
+    current_name=$(git config --global user.name 2>/dev/null)
+
+    for ((i=0; i<PROFILE_COUNT; i++)); do
+        profile_email=$(yq eval ".profiles[$i].email" "$YAML_FILE")
+        profile_name=$(yq eval ".profiles[$i].user_name" "$YAML_FILE")
+        if [ "$profile_email" = "$current_email" ] && [ "$profile_name" = "$current_name" ]; then
+            current_profile=$(yq eval ".profiles[$i].name" "$YAML_FILE")
+            break
+        fi
+    done
+
+    if [ -n "$current_profile" ]; then
+        echo "Current profile: $current_profile"
+    else
+        echo "Current profile: unknown (git config doesn't match any profile)"
+    fi
+    echo "  Name:  ${current_name:-"(not set)"}"
+    echo "  Email: ${current_email:-"(not set)"}"
+    echo ""
+    echo "Available profiles: ${(j: | :)PROFILE_NAMES}"
+    exit 0
+}
+
 if [ $# -eq 0 ]; then
-    usage
+    show_current_profile
 fi
 
 PROFILE=$1

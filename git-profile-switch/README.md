@@ -20,19 +20,19 @@ cd git-profile-switch
 
 ### 3. Configure Your Profiles
 
-Edit `profiles.yaml` to define your profiles. Each profile needs a `name`, `ssh_key`, `email`, and `git_name`:
+Edit `profiles.yaml` to define your profiles. Each profile needs a `name`, `ssh_key`, `email`, and `user_name`:
 
 ```yaml
 profiles:
   - name: personal
     ssh_key: ~/.ssh/personal_rsa
     email: your.personal@email.com
-    git_name: Your Name
+    user_name: Your Name
 
   - name: work
     ssh_key: ~/.ssh/work_rsa
     email: your.work@email.com
-    git_name: Your Work Name
+    user_name: Your Work Name
 ```
 
 You can add as many profiles as you need — no script modifications required.
@@ -67,6 +67,12 @@ After installation, you can switch between profiles using:
 gps <profile>
 ```
 
+You can also run `gps` without arguments to show the current profile and active Git identity:
+
+```bash
+gps
+```
+
 ### Examples
 
 Switch to personal profile:
@@ -81,6 +87,12 @@ Switch to work profile:
 gps work
 ```
 
+Show current profile information:
+
+```bash
+gps
+```
+
 ### Output
 
 When switching profiles, you'll see:
@@ -89,6 +101,16 @@ When switching profiles, you'll see:
 ✓ SSH key switched
 ✓ Switched to personal profile
   Your Name <your.personal@email.com>
+```
+
+When checking the current profile, you'll see:
+
+```
+Current profile: work
+  Name:  Your Work Name
+  Email: your.work@email.com
+
+Available profiles: personal | work
 ```
 
 ## What It Does
