@@ -44,7 +44,7 @@ This will:
 ## Usage
 
 ```
-git-pull-rebase-all [OPTIONS] [directory]
+pull-all [OPTIONS] [directory]
 ```
 
 | Option               | Description                               | Default           |
@@ -59,21 +59,15 @@ git-pull-rebase-all [OPTIONS] [directory]
 Run the command in a directory containing multiple git repositories:
 
 ```bash
-git-pull-rebase-all
-```
-
-Or using the short alias:
-
-```bash
 pull-all
 ```
 
 ### Specify a Target Directory
 
 ```bash
-git-pull-rebase-all ~/projects
-# or
-git-pull-rebase-all -p ~/projects
+pull-all ~/projects
+# or with the -p flag
+pull-all -p ~/projects
 ```
 
 ### Traverse Nested Directories
@@ -81,14 +75,14 @@ git-pull-rebase-all -p ~/projects
 Scan up to 3 levels deep:
 
 ```bash
-git-pull-rebase-all -maxD 3
-git-pull-rebase-all -maxD 3 ~/projects
+pull-all -maxD 3
+pull-all -maxD 3 ~/projects
 ```
 
 Skip the top level and only process repos at depth 2 and below:
 
 ```bash
-git-pull-rebase-all -minD 2 -maxD 3
+pull-all -minD 2 -maxD 3
 ```
 
 > **Note:** If only `-minD` is provided, `-maxD` defaults to match it.
@@ -137,7 +131,7 @@ Summary:
 
 1. The script traverses subdirectories recursively from the target directory, up to `-maxD` levels deep
 2. Directories shallower than `-minD` are descended into but not processed for repos
-3. For each directory at or beyond `--minD` that contains a `.git` folder, it:
+3. For each directory at or beyond `-minD` that contains a `.git` folder, it:
    - Saves the current branch name
    - Stashes any uncommitted changes (if present)
    - Fetches from all remotes
