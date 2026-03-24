@@ -1,17 +1,17 @@
 # Git Pull Rebase All
 
-A command-line tool to traverse all folders in a directory and automatically update ALL local branches in every git repository by rebasing them onto their upstream tracking branches.
+A command-line tool to traverse directories (with configurable depth) and automatically update ALL local branches in every git repository found by rebasing them onto their upstream tracking branches.
 
 ## Features
 
-- Automatically discovers all git repositories in subdirectories
+- Recursively discovers git repositories up to a configurable depth (`-maxD`)
+- Optionally skip shallow levels with `-minD` to target nested repos
 - Updates **all local branches** (not just the current branch) by rebasing onto their upstream
 - Fetches from all remotes before updating
 - Automatically stashes uncommitted changes and restores them after updates
 - Returns to the originally checked-out branch after updating all branches
 - Error handling: failures in one repository won't block others
 - Provides detailed summary of operations per repository
-- Optional: specify a target directory or use the current directory
 
 ## Installation
 
@@ -43,6 +43,17 @@ This will:
 
 ## Usage
 
+```
+git-pull-rebase-all [OPTIONS] [directory]
+```
+
+| Option               | Description                               | Default           |
+| -------------------- | ----------------------------------------- | ----------------- |
+| `-minD <n>`          | Minimum depth to start scanning for repos | `1`               |
+| `-maxD <n>`          | Maximum depth to traverse                 | `1`               |
+| `-p`, `--path <dir>` | Starting directory                        | current directory |
+| `-h`, `--help`       | Show help message                         | —                 |
+
 ### Basic Usage (Current Directory)
 
 Run the command in a directory containing multiple git repositories:
@@ -57,26 +68,36 @@ Or using the short alias:
 pull-all
 ```
 
-This will scan all subdirectories in the current directory and run `git pull --rebase` on each git repository found.
-
 ### Specify a Target Directory
-
-You can also specify a target directory:
 
 ```bash
 git-pull-rebase-all ~/projects
+# or
+git-pull-rebase-all -p ~/projects
 ```
 
-Or:
+### Traverse Nested Directories
+
+Scan up to 3 levels deep:
 
 ```bash
-pull-all ~/projects
+git-pull-rebase-all -maxD 3
+git-pull-rebase-all -maxD 3 ~/projects
 ```
+
+Skip the top level and only process repos at depth 2 and below:
+
+```bash
+git-pull-rebase-all -minD 2 -maxD 3
+```
+
+> **Note:** If only `-minD` is provided, `-maxD` defaults to match it.
 
 ## Example Output
 
 ```
 Scanning for git repositories in: .
+Depth range: 1 - 2
 ================================================
 
 [project-1]
@@ -114,9 +135,9 @@ Summary:
 
 ## How It Works
 
-1. The script traverses all immediate subdirectories of the target directory
-2. For each subdirectory, it checks if a `.git` folder exists
-3. If it's a git repository, it:
+1. The script traverses subdirectories recursively from the target directory, up to `-maxD` levels deep
+2. Directories shallower than `-minD` are descended into but not processed for repos
+3. For each directory at or beyond `--minD` that contains a `.git` folder, it:
    - Saves the current branch name
    - Stashes any uncommitted changes (if present)
    - Fetches from all remotes

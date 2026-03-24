@@ -1,174 +1,268 @@
 #!/bin/zsh
-# Script to traverse all folders and run git pull --rebase on git repositories
+# Traverses subdirectories and rebases all tracked branches in each git repository.
 
+# ── Constants ─────────────────────────────────────────────────────────────────
+readonly SEPARATOR="================================================"
+readonly STASH_MESSAGE="Auto-stash by git-pull-rebase-all"
+
+# ── Usage / Validation ────────────────────────────────────────────────────────
 usage() {
-    echo "Usage: git-pull-rebase-all [directory]"
+    echo "Usage: git-pull-rebase-all [OPTIONS] [directory]"
     echo ""
-    echo "Traverses all folders in the specified directory (or current directory)"
-    echo "and runs 'git pull --rebase' on each git repository found."
+    echo "Traverses directories and rebases all tracked branches in each git repository found."
+    echo ""
+    echo "Options:"
+    echo "  -minD <n>            Minimum depth to start scanning for repos (default: 1)"
+    echo "  -maxD <n>            Maximum depth to traverse (default: 1)"
+    echo "  -p, --path <dir>     Starting directory (default: current directory)"
+    echo "  -h, --help           Show this help message"
     echo ""
     echo "Arguments:"
-    echo "  directory    Optional: Directory to scan (defaults to current directory)"
+    echo "  directory    Optional: Starting directory to scan (defaults to current directory)"
+    echo ""
+    echo "Examples:"
+    echo "  git-pull-rebase-all"
+    echo "  git-pull-rebase-all ~/projects"
+    echo "  git-pull-rebase-all -maxD 3"
+    echo "  git-pull-rebase-all -minD 2 -maxD 4 -p ~/projects"
     exit 1
 }
 
-# Get the target directory
-TARGET_DIR="${1:-.}"
-
-# Check if directory exists
-if [ ! -d "$TARGET_DIR" ]; then
-    echo "Error: Directory '$TARGET_DIR' does not exist"
-    exit 1
-fi
-
-echo "Scanning for git repositories in: $TARGET_DIR"
-echo "================================================"
-echo ""
-
-# Counter for stats
-total_repos=0
-success_repos=0
-failed_repos=0
-
-# Traverse all subdirectories in the target directory
-for dir in "$TARGET_DIR"/*/; do
-    # Remove trailing slash
-    dir="${dir%/}"
-    
-    # Get just the folder name
-    folder_name=$(basename "$dir")
-    
-    # Check if it's a git repository
-    if [ -d "$dir/.git" ]; then
-        total_repos=$((total_repos + 1))
-        echo "[$folder_name]"
-        
-        # Change to the directory and run git pull --rebase
-        cd "$dir" || {
-            echo "  ✗ Failed to enter directory"
-            failed_repos=$((failed_repos + 1))
-            echo ""
-            continue
-        }
-        
-        # Save current branch
-        current_branch=$(git symbolic-ref --short HEAD 2>/dev/null)
-        if [ -z "$current_branch" ]; then
-            echo "  ⚠ Not on a branch (detached HEAD), skipping"
-            failed_repos=$((failed_repos + 1))
-            cd - > /dev/null || exit
-            echo ""
-            continue
-        fi
-        
-        # Check if there are uncommitted changes
-        stashed=false
-        if ! git diff-index --quiet HEAD -- 2>/dev/null || ! git diff --quiet 2>/dev/null; then
-            echo "  ⚠ Unstaged changes detected, stashing..."
-            if git stash save "Auto-stash by git-pull-rebase-all" > /dev/null 2>&1; then
-                stashed=true
-            fi
-        fi
-        
-        # Fetch all remotes
-        echo "  ↓ Fetching from remotes..."
-        if ! git fetch --all --prune > /dev/null 2>&1; then
-            echo "  ✗ Failed to fetch from remotes"
-            
-            # Restore stash if needed
-            if [ "$stashed" = true ]; then
-                git stash pop > /dev/null 2>&1
-            fi
-            
-            failed_repos=$((failed_repos + 1))
-            cd - > /dev/null || exit
-            echo ""
-            continue
-        fi
-        
-        # Get all local branches with upstream tracking branches
-        local_branches=$(git for-each-ref --format='%(refname:short) %(upstream:short)' refs/heads/ | grep -v '^[^ ]* $')
-        
-        repo_success=true
-        updated_count=0
-        skipped_count=0
-        
-        # Update each local branch
-        while IFS=' ' read -r branch upstream; do
-            if [ -z "$upstream" ]; then
-                continue
-            fi
-            
-            echo "  → Updating branch: $branch"
-            
-            # Checkout the branch
-            if ! git checkout "$branch" > /dev/null 2>&1; then
-                echo "    ✗ Failed to checkout $branch"
-                repo_success=false
-                continue
-            fi
-            
-            # Rebase onto upstream
-            if git rebase "$upstream" > /dev/null 2>&1; then
-                echo "    ✓ Rebased $branch onto $upstream"
-                updated_count=$((updated_count + 1))
-            else
-                echo "    ✗ Failed to rebase $branch"
-                # Abort the rebase to leave the repo in a clean state
-                git rebase --abort > /dev/null 2>&1
-                repo_success=false
-            fi
-        done <<< "$local_branches"
-        
-        # Count branches without upstream
-        total_branches=$(git for-each-ref --format='%(refname:short)' refs/heads/ | wc -l | tr -d ' ')
-        branches_with_upstream=$(echo "$local_branches" | grep -c . || echo 0)
-        skipped_count=$((total_branches - branches_with_upstream))
-        
-        # Return to original branch
-        if ! git checkout "$current_branch" > /dev/null 2>&1; then
-            echo "  ⚠ Failed to return to original branch: $current_branch"
-            repo_success=false
-        else
-            echo "  ← Returned to branch: $current_branch"
-        fi
-        
-        # Restore stashed changes if any
-        if [ "$stashed" = true ]; then
-            echo "  ↻ Restoring stashed changes..."
-            if git stash pop > /dev/null 2>&1; then
-                echo "  ✓ Stashed changes restored"
-            else
-                echo "  ⚠ Failed to restore stash (may have conflicts)"
-                repo_success=false
-            fi
-        fi
-        
-        # Print summary for this repo
-        if [ "$repo_success" = true ]; then
-            echo "  ✓ Repository update complete ($updated_count updated, $skipped_count without upstream)"
-            success_repos=$((success_repos + 1))
-        else
-            echo "  ✗ Repository update had errors"
-            failed_repos=$((failed_repos + 1))
-        fi
-        
-        # Return to the original directory
-        cd - > /dev/null || exit
-        echo ""
+validate_directory() {
+    local dir="$1"
+    if [[ ! -d "$dir" ]]; then
+        echo "Error: Directory '$dir' does not exist"
+        exit 1
     fi
-done
+}
 
-# Print summary
-echo "================================================"
-echo "Summary:"
-echo "  Total repositories found: $total_repos"
-echo "  Successful: $success_repos"
-echo "  Failed: $failed_repos"
+validate_depth() {
+    local min_depth="$1" max_depth="$2"
+    if ! [[ "$min_depth" =~ ^[0-9]+$ ]] || [[ "$min_depth" -lt 1 ]]; then
+        echo "Error: -minD must be a positive integer"; exit 1
+    fi
+    if ! [[ "$max_depth" =~ ^[0-9]+$ ]] || [[ "$max_depth" -lt 1 ]]; then
+        echo "Error: -maxD must be a positive integer"; exit 1
+    fi
+    if [[ "$min_depth" -gt "$max_depth" ]]; then
+        echo "Error: -minD ($min_depth) cannot be greater than -maxD ($max_depth)"; exit 1
+    fi
+}
 
-# Exit with appropriate code
-if [ $failed_repos -gt 0 ]; then
-    exit 1
-else
-    exit 0
-fi
+# ── Git Helpers ───────────────────────────────────────────────────────────────
+current_branch() {
+    git symbolic-ref --short HEAD 2>/dev/null
+}
+
+has_uncommitted_changes() {
+    ! git diff-index --quiet HEAD -- 2>/dev/null || ! git diff --quiet 2>/dev/null
+}
+
+stash_changes()   { git stash save "$STASH_MESSAGE" > /dev/null 2>&1; }
+pop_stash()       { git stash pop > /dev/null 2>&1; }
+fetch_remotes()   { git fetch --all --prune > /dev/null 2>&1; }
+checkout_branch() { git checkout "$1" > /dev/null 2>&1; }
+rebase_onto()     { git rebase "$1" > /dev/null 2>&1; }
+abort_rebase()    { git rebase --abort > /dev/null 2>&1; }
+
+branches_with_upstream() {
+    git for-each-ref --format='%(refname:short) %(upstream:short)' refs/heads/ \
+        | grep -v '^[^ ]* $'
+}
+
+total_branch_count() {
+    git for-each-ref --format='%(refname:short)' refs/heads/ | wc -l | tr -d ' '
+}
+
+# ── Repo Processing ───────────────────────────────────────────────────────────
+# Script-level state shared across functions.
+_stashed=false
+_repo_success=true
+_updated_count=0
+_skipped_count=0
+_total_repos=0
+_success_repos=0
+_failed_repos=0
+
+handle_stash() {
+    _stashed=false
+    if has_uncommitted_changes; then
+        echo "  ⚠ Unstaged changes detected, stashing..."
+        stash_changes && _stashed=true
+    fi
+}
+
+handle_restore_stash() {
+    [[ "$_stashed" != true ]] && return 0
+    echo "  ↻ Restoring stashed changes..."
+    if pop_stash; then
+        echo "  ✓ Stashed changes restored"
+    else
+        echo "  ⚠ Failed to restore stash (may have conflicts)"
+        _repo_success=false
+    fi
+}
+
+update_branch() {
+    local branch="$1" upstream="$2"
+    echo "  → Updating branch: $branch"
+
+    if ! checkout_branch "$branch"; then
+        echo "    ✗ Failed to checkout $branch"
+        return 1
+    fi
+
+    if rebase_onto "$upstream"; then
+        echo "    ✓ Rebased $branch onto $upstream"
+    else
+        echo "    ✗ Failed to rebase $branch"
+        abort_rebase
+        return 1
+    fi
+}
+
+update_all_tracked_branches() {
+    _updated_count=0
+    local branch_list
+    branch_list=$(branches_with_upstream)
+
+    while IFS=' ' read -r branch upstream; do
+        [[ -z "$upstream" ]] && continue
+        if update_branch "$branch" "$upstream"; then
+            _updated_count=$(( _updated_count + 1 ))
+        else
+            _repo_success=false
+        fi
+    done <<< "$branch_list"
+
+    local total with_upstream
+    total=$(total_branch_count)
+    with_upstream=$(echo "$branch_list" | grep -c . 2>/dev/null || echo 0)
+    _skipped_count=$(( total - with_upstream ))
+}
+
+process_repo() {
+    local dir="$1"
+    local folder_name orig_branch
+    folder_name=$(basename "$dir")
+    _repo_success=true
+
+    echo "[$folder_name]"
+
+    pushd "$dir" > /dev/null || { echo "  ✗ Failed to enter directory"; echo ""; return 1; }
+
+    orig_branch=$(current_branch)
+    if [[ -z "$orig_branch" ]]; then
+        echo "  ⚠ Not on a branch (detached HEAD), skipping"
+        popd > /dev/null; echo ""; return 1
+    fi
+
+    handle_stash
+
+    echo "  ↓ Fetching from remotes..."
+    if ! fetch_remotes; then
+        echo "  ✗ Failed to fetch from remotes"
+        [[ "$_stashed" == true ]] && pop_stash
+        popd > /dev/null; echo ""; return 1
+    fi
+
+    update_all_tracked_branches
+
+    if ! checkout_branch "$orig_branch"; then
+        echo "  ⚠ Failed to return to original branch: $orig_branch"
+        _repo_success=false
+    else
+        echo "  ← Returned to branch: $orig_branch"
+    fi
+
+    handle_restore_stash
+
+    if [[ "$_repo_success" == true ]]; then
+        echo "  ✓ Repository update complete ($_updated_count updated, $_skipped_count without upstream)"
+    else
+        echo "  ✗ Repository update had errors"
+    fi
+
+    popd > /dev/null
+    echo ""
+    [[ "$_repo_success" == true ]]
+}
+
+traverse_repos() {
+    local current_dir="$1"
+    local current_depth="$2"
+    local min_depth="$3"
+    local max_depth="$4"
+
+    [[ "$current_depth" -gt "$max_depth" ]] && return
+
+    for dir in "$current_dir"/*/; do
+        [[ -d "$dir" ]] || continue
+        dir="${dir%/}"
+
+        if [[ "$current_depth" -ge "$min_depth" && -d "$dir/.git" ]]; then
+            _total_repos=$(( _total_repos + 1 ))
+            if process_repo "$dir"; then
+                _success_repos=$(( _success_repos + 1 ))
+            else
+                _failed_repos=$(( _failed_repos + 1 ))
+            fi
+        fi
+
+        if [[ "$current_depth" -lt "$max_depth" ]]; then
+            traverse_repos "$dir" $(( current_depth + 1 )) "$min_depth" "$max_depth"
+        fi
+    done
+}
+
+# ── Output ────────────────────────────────────────────────────────────────────
+print_header() {
+    local dir="$1" min_depth="$2" max_depth="$3"
+    echo "Scanning for git repositories in: $dir"
+    echo "Depth range: $min_depth - $max_depth"
+    echo "$SEPARATOR"
+    echo ""
+}
+
+print_summary() {
+    local total="$1" success="$2" failed="$3"
+    echo "$SEPARATOR"
+    echo "Summary:"
+    echo "  Total repositories found: $total"
+    echo "  Successful: $success"
+    echo "  Failed: $failed"
+}
+
+# ── Entry Point ───────────────────────────────────────────────────────────────
+main() {
+    local min_depth=1 max_depth=1 target_dir="."
+    local min_depth_set=false max_depth_set=false
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -minD|--minD) min_depth="$2"; min_depth_set=true; shift 2 ;;
+            -maxD|--maxD) max_depth="$2"; max_depth_set=true; shift 2 ;;
+            -p|--path)    target_dir="$2"; shift 2 ;;
+            -h|--help)    usage ;;
+            *)            target_dir="$1"; shift ;;
+        esac
+    done
+
+    # If only -minD was set, default -maxD to match
+    [[ "$min_depth_set" == true && "$max_depth_set" == false ]] && max_depth="$min_depth"
+
+    validate_depth "$min_depth" "$max_depth"
+    validate_directory "$target_dir"
+    print_header "$target_dir" "$min_depth" "$max_depth"
+
+    _total_repos=0
+    _success_repos=0
+    _failed_repos=0
+
+    traverse_repos "$target_dir" 1 "$min_depth" "$max_depth"
+
+    print_summary "$_total_repos" "$_success_repos" "$_failed_repos"
+    [[ "$_failed_repos" -eq 0 ]]
+}
+
+main "$@"
